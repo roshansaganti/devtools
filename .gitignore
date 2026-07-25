@@ -1,2 +1,2 @@
 # Ignore MySQL data directory
-/db/mysql_data
+/mysql/mysql_data
