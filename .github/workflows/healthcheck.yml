@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  ping:
+  postgres:
     runs-on: ubuntu-latest
     container:
       image: postgres:alpine
@@ -26,3 +26,31 @@ jobs:
           PGSSLMODE: require
           PGCONNECT_TIMEOUT: 15
         run: psql -X -v ON_ERROR_STOP=1 -c 'SELECT 1;'
+  notify:
+    # Job will run if either job succeeds
+    needs: [postgres]
+    if: always()
+
+    name: "Notify"
+    runs-on: ubuntu-latest
+    permissions:
+      actions: "read"
+      contents: "read"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # PostgreSQL Healthcheck
+      - name: Send failure notification
+        if: needs.postgres.result == 'failure'
+        uses: ./.github/actions/notify
+        with:
+          discord_webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          target_job_id: "postgres"
+          github_token: ${{ github.token }}
+          title: ""
+          description: ":x: **FAILED to connect to PostgreSQL!**"
+          author_icon_url: "https://cdn.pixabay.com/photo/2025/10/24/13/18/halloween-9914212_1280.png"
+          image_url: "https://cdn.pixabay.com/photo/2020/09/23/19/58/halloween-5596921_1280.jpg"
+          footer_icon_url: "https://cdn.pixabay.com/photo/2025/10/24/13/18/halloween-9914212_1280.png"
