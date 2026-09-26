@@ -1,0 +1,60 @@
+name: PostgreSQL healthcheck
+
+on:
+  # For testing
+  # pull_request:
+  #   branches:
+  #     - master
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+jobs:
+  postgres:
+    runs-on: ubuntu-latest
+    container:
+      image: postgres:alpine
+    timeout-minutes: 5
+    steps:
+      - name: Ping Aiven PostgreSQL
+        env:
+          PGHOST: ${{ secrets.DB_HOST }}
+          PGPORT: ${{ secrets.DB_PORT }}
+          PGDATABASE: ${{ secrets.DB_NAME }}
+          PGUSER: ${{ secrets.DB_USER }}
+          PGPASSWORD: ${{ secrets.DB_PASS }}
+          PGSSLMODE: require
+          PGCONNECT_TIMEOUT: 15
+        run: psql -X -v ON_ERROR_STOP=1 -c 'SELECT 1;'
+  notify:
+    # Job will run if either job succeeds
+    needs: [postgres]
+    if: always()
+
+    name: "Notify"
+    runs-on: ubuntu-latest
+    permissions:
+      actions: "read"
+      contents: "read"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # PostgreSQL Healthcheck
+      - name: Send failure notification
+        if: needs.postgres.result == 'failure'
+        uses: ./.github/actions/notify
+        with:
+          discord_webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          target_job_id: "postgres"
+          github_token: ${{ github.token }}
+          title: ""
+          color: "16711680"
+          description: ":x: **FAILED to connect to PostgreSQL!**"
+          discord_username: "GitHub Actions"
+          discord_avatar: "https://cdn.pixabay.com/photo/2017/08/05/11/24/logo-2582757_1280.png"
+          author_icon_url: "https://cdn.pixabay.com/photo/2017/08/05/11/24/logo-2582757_1280.png"
+          image_url: "https://cdn.pixabay.com/photo/2024/08/11/14/14/error-8961541_1280.png"
+          footer_text: "PostgreSQL Healthcheck"
+          footer_icon_url: "https://cdn.pixabay.com/photo/2017/08/05/11/24/logo-2582757_1280.png"

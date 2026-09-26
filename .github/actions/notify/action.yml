@@ -1,0 +1,283 @@
+name: Notify
+
+description: Send a Discord notification embed for crawler job results.
+
+inputs:
+  discord_webhook:
+    description: Discord webhook URL
+    required: true
+  discord_username:
+    description: Discord username shown in the message
+    required: false
+    default: Crawliday
+  discord_avatar:
+    description: Discord avatar URL
+    required: false
+    default: "https://cdn.pixabay.com/photo/2025/10/24/13/18/halloween-9914212_1280.png"
+  discord_mentions:
+    description: Discord mention string, usually empty
+    required: false
+    default: ""
+  target_job_id:
+    description: "Workflow job ID to link directly to logs (for example: halloween)"
+    required: true
+  github_token:
+    description: GitHub token used to resolve the job URL from the current run
+    required: true
+  title:
+    description: Embed title
+    required: true
+  description:
+    description: Embed description
+    required: true
+  runtime:
+    description: Optional precomputed runtime string for the target job
+    required: false
+    default: "N/A"
+  color:
+    description: Embed color integer
+    required: false
+    default: "16753920"
+  url:
+    description: Embed URL
+    required: false
+    default: "https://discord.com"
+  author_name:
+    description: Author name
+    required: false
+    default: Crawliday
+  author_url:
+    description: Author URL
+    required: false
+    default: "https://crawliday.vercel.app/"
+  author_icon_url:
+    description: Author icon URL
+    required: false
+    default: "https://cdn.pixabay.com/photo/2025/10/24/13/18/halloween-9914212_1280.png"
+  image_url:
+    description: Image URL for the embed
+    required: false
+    default: "https://cdn.pixabay.com/photo/2020/09/23/19/58/halloween-5596921_1280.jpg"
+  footer_text:
+    description: Footer text
+    required: false
+    default: Crawliday
+  footer_icon_url:
+    description: Footer icon URL
+    required: false
+    default: "https://cdn.pixabay.com/photo/2025/10/24/13/18/halloween-9914212_1280.png"
+
+runs:
+  using: composite
+  steps:
+    - name: Build Discord embed payload
+      id: embed
+      shell: bash
+      env:
+        TITLE: ${{ inputs.title }}
+        DESCRIPTION: ${{ inputs.description }}
+        RUNTIME: ${{ inputs.runtime }}
+        COLOR: ${{ inputs.color }}
+        URL: ${{ inputs.url }}
+        AUTHOR_NAME: ${{ inputs.author_name }}
+        AUTHOR_URL: ${{ inputs.author_url }}
+        AUTHOR_ICON_URL: ${{ inputs.author_icon_url }}
+        IMAGE_URL: ${{ inputs.image_url }}
+        FOOTER_TEXT: ${{ inputs.footer_text }}
+        FOOTER_ICON_URL: ${{ inputs.footer_icon_url }}
+        TARGET_JOB_ID: ${{ inputs.target_job_id }}
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+      run: |
+        python - <<'PY'
+        import json
+        import os
+        import urllib.request
+        import urllib.error
+        from datetime import datetime, timezone
+
+        title = os.environ.get("TITLE", "")
+        description = os.environ.get("DESCRIPTION", "")
+        runtime_override = (os.environ.get("RUNTIME") or "").strip()
+        color = int(os.environ.get("COLOR", "16753920"))
+        url = os.environ.get("URL") or ""
+        author_name = os.environ.get("AUTHOR_NAME") or "Crawliday"
+        author_url = os.environ.get("AUTHOR_URL") or ""
+        author_icon_url = os.environ.get("AUTHOR_ICON_URL") or ""
+        image_url = os.environ.get("IMAGE_URL") or ""
+        footer_text = os.environ.get("FOOTER_TEXT") or "Crawliday"
+        footer_icon_url = os.environ.get("FOOTER_ICON_URL") or ""
+        github_server_url = (os.environ.get("GITHUB_SERVER_URL") or "https://github.com").rstrip("/")
+        github_repository = (os.environ.get("GITHUB_REPOSITORY") or "").strip("/")
+        github_run_id = (os.environ.get("GITHUB_RUN_ID") or "").strip()
+        target_job_id = (os.environ.get("TARGET_JOB_ID") or "").strip().lower()
+        github_token = (os.environ.get("GITHUB_TOKEN") or "").strip()
+        trigger_name = (os.environ.get("GITHUB_EVENT_NAME") or "unknown").strip()
+        branch_name = (
+          os.environ.get("GITHUB_HEAD_REF")
+          or os.environ.get("GITHUB_REF_NAME")
+          or ""
+        ).strip()
+        if not branch_name:
+          ref = (os.environ.get("GITHUB_REF") or "").strip()
+          branch_name = ref.rsplit("/", 1)[-1] if "/" in ref else (ref or "unknown")
+
+        def normalize_job_identifier(value):
+          return "".join(ch for ch in (value or "").strip().lower() if ch.isalnum() or ch in {"_", "-"})
+
+        def job_matches_target(job, target):
+          if not target:
+            return False
+
+          target_norm = normalize_job_identifier(target)
+          if not target_norm:
+            return False
+
+          job_name = (job.get("name") or "").strip()
+          job_name_norm = normalize_job_identifier(job_name)
+
+          if job_name_norm == target_norm:
+            return True
+
+          # Workflow jobs often have human-readable names (e.g. "Crawl Christmas Movies")
+          # while target IDs are short keys (e.g. "christmas").
+          if target_norm in job_name_norm:
+            return True
+
+          for step in (job.get("steps") or []):
+            step_name_norm = normalize_job_identifier(step.get("name") or "")
+            if target_norm and target_norm in step_name_norm:
+              return True
+
+          return False
+
+        def parse_github_datetime(value):
+          if not value:
+            return None
+          try:
+            # GitHub timestamps are ISO-8601 with trailing Z.
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+          except ValueError:
+            return None
+
+        def format_runtime(started_at, completed_at):
+          start_dt = parse_github_datetime(started_at)
+          end_dt = parse_github_datetime(completed_at)
+          if not start_dt or not end_dt:
+            return "N/A"
+
+          total_seconds = int((end_dt - start_dt).total_seconds())
+          if total_seconds < 0:
+            return "N/A"
+
+          hours, remainder = divmod(total_seconds, 3600)
+          minutes, seconds = divmod(remainder, 60)
+          if hours > 0:
+            return f"{hours}h {minutes}m {seconds}s"
+          if minutes > 0:
+            return f"{minutes}m {seconds}s"
+          return f"{seconds}s"
+
+        def resolve_job_url(server_url, repository, run_id, job_id, token):
+          if not repository or not run_id:
+            return f"{server_url}/actions", "N/A"
+
+          run_url = f"{server_url}/{repository}/actions/runs/{run_id}"
+          if not job_id or not token:
+            return run_url, "N/A"
+
+          api_url = f"https://api.github.com/repos/{repository}/actions/runs/{run_id}/jobs?per_page=100"
+          req = urllib.request.Request(
+            api_url,
+            headers={
+              "Accept": "application/vnd.github+json",
+              "Authorization": f"Bearer {token}",
+              "X-GitHub-Api-Version": "2022-11-28",
+            },
+          )
+
+          try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+              data = json.loads(resp.read().decode("utf-8"))
+          except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, ValueError):
+            return run_url, "N/A"
+
+          jobs = data.get("jobs", [])
+          for job in jobs:
+            if job_matches_target(job, job_id):
+              resolved_job_id = job.get("id")
+              runtime = format_runtime(job.get("started_at"), job.get("completed_at"))
+              if resolved_job_id:
+                return f"{server_url}/{repository}/actions/runs/{run_id}/job/{resolved_job_id}", runtime
+              return run_url, runtime
+
+          return run_url, "N/A"
+
+        if github_repository and github_run_id:
+          run_url, runtime = resolve_job_url(
+            github_server_url,
+            github_repository,
+            github_run_id,
+            target_job_id,
+            github_token,
+          )
+        elif github_repository:
+          run_url = f"{github_server_url}/{github_repository}/actions"
+          runtime = "N/A"
+        else:
+          run_url = "https://github.com"
+          runtime = "N/A"
+
+        if runtime_override and runtime_override != "N/A":
+          runtime = runtime_override
+
+        ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+
+        payload = [{
+            "title": title,
+            "description": description + "\n\n[View Logs](" + run_url + ")",
+            "color": color,
+            "timestamp": ts,
+            "url": url,
+            "author": {
+                "name": author_name,
+                "url": author_url,
+                "icon_url": author_icon_url,
+            },
+            "image": {"url": image_url} if image_url else None,
+            "footer": {
+                "text": footer_text,
+                "icon_url": footer_icon_url,
+            },
+            "fields": [
+                {
+                    "name": "Runtime",
+                    "value": runtime,
+                    "inline": "true"
+                },
+                {
+                    "name": "Trigger",
+                    "value": trigger_name,
+                    "inline": "true"
+                },
+                {
+                    "name": "Branch",
+                    "value": branch_name,
+                    "inline": "true"
+                }
+            ]
+        }]
+        payload = [item for item in payload if item is not None]
+        encoded = json.dumps(payload)
+
+        with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+            fh.write(f"embeds={encoded}\n")
+        PY
+
+    - name: Send Discord notification
+      uses: Ilshidur/action-discord@master
+      env:
+        DISCORD_WEBHOOK: ${{ inputs.discord_webhook }}
+        DISCORD_USERNAME: ${{ inputs.discord_username }}
+        DISCORD_AVATAR: ${{ inputs.discord_avatar }}
+        DISCORD_MENTIONS: ${{ inputs.discord_mentions }}
+        DISCORD_EMBEDS: ${{ steps.embed.outputs.embeds }}
