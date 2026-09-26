@@ -51,6 +51,7 @@ jobs:
           github_token: ${{ github.token }}
           title: ""
           description: ":x: **FAILED to connect to PostgreSQL!**"
-          author_icon_url: "https://cdn.pixabay.com/photo/2025/10/24/13/18/halloween-9914212_1280.png"
-          image_url: "https://cdn.pixabay.com/photo/2020/09/23/19/58/halloween-5596921_1280.jpg"
-          footer_icon_url: "https://cdn.pixabay.com/photo/2025/10/24/13/18/halloween-9914212_1280.png"
+          author_icon_url: "https://cdn.pixabay.com/photo/2017/08/05/11/24/logo-2582757_1280.png"
+          image_url: "https://cdn.pixabay.com/photo/2024/08/11/14/14/error-8961541_1280.png"
+          footer_text: "PostgreSQL Healthcheck"
+          footer_icon_url: "https://cdn.pixabay.com/photo/2017/08/05/11/24/logo-2582757_1280.png"
