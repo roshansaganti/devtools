@@ -3,3 +3,4 @@
 
 # Ignore MongoDB data directory
 /mongodb/mongo_data
+/postgresql
