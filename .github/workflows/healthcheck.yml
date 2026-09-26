@@ -51,6 +51,8 @@ jobs:
           github_token: ${{ github.token }}
           title: ""
           description: ":x: **FAILED to connect to PostgreSQL!**"
+          discord_username: "GitHub Actions"
+          discord_avatar: "https://cdn.pixabay.com/photo/2017/08/05/11/24/logo-2582757_1280.png"
           author_icon_url: "https://cdn.pixabay.com/photo/2017/08/05/11/24/logo-2582757_1280.png"
           image_url: "https://cdn.pixabay.com/photo/2024/08/11/14/14/error-8961541_1280.png"
           footer_text: "PostgreSQL Healthcheck"
