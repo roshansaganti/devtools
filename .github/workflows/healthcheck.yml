@@ -22,8 +22,8 @@ jobs:
           DB_PORT: ${{ secrets.DB_PORT }}
           DB_NAME: ${{ secrets.DB_NAME }}
           DB_USER: ${{ secrets.DB_USER }}
-          MYSQL_PWD: ${{ secrets.DB_PASS }}
-        run: mariadb --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USER" --connect-timeout=15 --ssl "$DB_NAME" --execute='SELECT 1;'
+          DB_PASS: ${{ secrets.DB_PASS }}
+        run: mariadb --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USER" --password="$DB_PASS" --connect-timeout=15 --ssl "$DB_NAME" --execute='SELECT 1;'
   notify:
     # Job will run if either job succeeds
     needs: [mysql]
