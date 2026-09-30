@@ -23,7 +23,10 @@ jobs:
           DB_NAME: ${{ secrets.DB_NAME }}
           DB_USER: ${{ secrets.DB_USER }}
           DB_PASS: ${{ secrets.DB_PASS }}
-        run: mariadb --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USER" --password="$DB_PASS" --connect-timeout=15 "$DB_NAME" --execute='SELECT 1;'
+          SSL_CA: ${{ secrets.SSL_CA }}
+        run: |
+          printf '%s\n' "$SSL_CA" > "$RUNNER_TEMP/ca.pem"
+          mariadb --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USER" --password="$DB_PASS" --connect-timeout=15 --ssl --ssl-ca="$RUNNER_TEMP/ca.pem" --ssl-verify-server-cert "$DB_NAME" --execute='SELECT 1;'
   notify:
     if: false
     # Job will run if either job succeeds
