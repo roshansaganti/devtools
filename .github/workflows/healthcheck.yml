@@ -25,9 +25,10 @@ jobs:
           DB_PASS: ${{ secrets.DB_PASS }}
         run: mariadb --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USER" --password="$DB_PASS" --connect-timeout=15 --ssl "$DB_NAME" --execute='SELECT 1;'
   notify:
+    if: false
     # Job will run if either job succeeds
     needs: [mysql]
-    if: always()
+    # if: always()
 
     name: "Notify"
     runs-on: ubuntu-latest
