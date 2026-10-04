@@ -1,4 +1,4 @@
-name: MySQL healthcheck
+name: Healthchecks
 
 on:
   # For testing
