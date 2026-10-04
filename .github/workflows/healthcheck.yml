@@ -27,6 +27,15 @@ jobs:
         run: |
           printf '%s\n' "$SSL_CA" > "$RUNNER_TEMP/ca.pem"
           mariadb --host="$DB_HOST" --port="$DB_PORT" --user="$DB_USER" --password="$DB_PASS" --connect-timeout=15 --ssl --ssl-ca="$RUNNER_TEMP/ca.pem" --ssl-verify-server-cert "$DB_NAME" --execute='SELECT 1;'
+  django:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping Django
+        env:
+          BACKEND_API: ${{ secrets.BACKEND_API }}
+        run: |
+          curl --fail --silent --show-error --location --retry 3 --retry-delay 10 --retry-all-errors --max-time 90 --output /dev/null --write-out 'HTTP %{http_code} in %{time_total}s\n' "$BACKEND_API"
   notify:
     if: false
     # Job will run if either job succeeds
