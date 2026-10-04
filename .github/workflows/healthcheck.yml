@@ -1,4 +1,4 @@
-name: Healthchecks
+name: Healthcheck
 
 on:
   # For testing
