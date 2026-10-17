@@ -40,6 +40,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Ping Backend Server
+        env:
+          BACKEND_API: ${{ secrets.PHILLY_CALMING_TRACKER_BACKEND_API }}
+        run: |
+          curl --fail --silent --show-error --location --retry 3 --retry-delay 10 --retry-all-errors --max-time 90 --output /dev/null --write-out 'HTTP %{http_code} in %{time_total}s\n' "$BACKEND_API"
       - name: Ping MCP Server
         env:
           MCP_SERVER_API: ${{ secrets.PHILLY_CALMING_TRACKER_MCP_SERVER_API }}
